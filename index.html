@@ -407,6 +407,14 @@ button:disabled { opacity:.55; }
   .mobile-brand { white-space:nowrap; flex-shrink:0; }
 }
 
+
+/* v1.2: 認証とパスワード再設定 */
+.forgot-link{color:#d66c64!important;font-weight:800;white-space:normal;text-decoration:underline;text-underline-offset:3px;margin-top:14px!important;min-height:42px}
+.auth-flow-label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#ca6a61;margin-bottom:19px}
+.auth-flow-label svg{width:18px;height:18px}
+.auth-box .info{margin:12px 0 18px;line-height:1.7}
+.auth-box .feedback{margin-bottom:16px}
+.auth-box .btn{min-height:45px}
 </style>
 </head>
 <body>
@@ -518,7 +526,7 @@ window.FUTARI_CONFIG = {
   function blankExpense(){return {store_name:'',spent_on:today(),total:'',payment_method:'未設定',memo:'',receipt_path:null,items:[{key:uid(),name:'',quantity:'1',amount:'',category:'食費'}]};}
   function readLocal(){try{const x=JSON.parse(localStorage.getItem(DATA_KEY)||'{}');return {shopping:Array.isArray(x.shopping)?x.shopping:[],expenses:Array.isArray(x.expenses)?x.expenses:[]};}catch{return{shopping:[],expenses:[]};}}
   const initial=readLocal();
-  const state={tab:'home',month:today().slice(0,7),shopping:initial.shopping,expenses:initial.expenses,cloud:null,user:null,household:null,authMode:'login',householdMode:'create',cloudReady:false,cloudLoading:false,busy:false,notice:'',error:'',modal:null,editor:blankExpense(),entryMode:'photo',receiptFile:null,receiptURL:'',ocrRaw:'',ocrWarn:[],ocrWorking:false,ocrProgress:'',expanded:null,showDone:true,config:{url:'',key:''}};
+  const state={tab:'home',month:today().slice(0,7),shopping:initial.shopping,expenses:initial.expenses,cloud:null,user:null,household:null,authMode:'login',resetEmail:'',householdMode:'create',cloudReady:false,cloudLoading:false,busy:false,notice:'',error:'',modal:null,editor:blankExpense(),entryMode:'photo',receiptFile:null,receiptURL:'',ocrRaw:'',ocrWarn:[],ocrWorking:false,ocrProgress:'',expanded:null,showDone:true,config:{url:'',key:''}};
   const app=document.getElementById('app');
   function setNotice(s,isError=false){state.notice=isError?'':s;state.error=isError?s:'';render();}
   function persist(){if(state.cloud)return;try{localStorage.setItem(DATA_KEY,JSON.stringify({shopping:state.shopping,expenses:state.expenses}));}catch{state.error='保存できませんでした。端末の空き容量をご確認ください。';}}
@@ -526,11 +534,12 @@ window.FUTARI_CONFIG = {
   function activeHome(){return state.household?.name || 'わが家';}
   function renderFeedback(){return `${state.notice?`<div class="feedback" role="status">${icon('check')} ${esc(state.notice)} <button data-action="dismiss" aria-label="閉じる">×</button></div>`:''}${state.error?`<div class="feedback error" role="alert">${icon('info')} ${esc(state.error)} <button data-action="dismiss" aria-label="閉じる">×</button></div>`:''}`;}
   function render(){
-    if(state.cloudLoading){app.innerHTML=`<div class="boot"><div class="brand-icon">⌂</div><div class="loading-inline"><i class="loading-spinner"></i> 共有データを読み込み中…</div></div>`;return;}
+    if(state.cloudLoading && state.authMode!=='recover'){app.innerHTML=`<div class="boot"><div class="brand-icon">⌂</div><div class="loading-inline"><i class="loading-spinner"></i> 共有データを読み込み中…</div></div>`;return;}
+    if(state.cloud && (state.authMode==='recover'||state.authMode==='recover-done')){app.innerHTML=passwordRecoveryScreen();return;}
     if(state.cloud && !state.user){app.innerHTML=authScreen();return;}
     if(state.cloud && state.user && !state.household){app.innerHTML=householdScreen();return;}
     const names=[['home','ホーム','home'],['shopping','買い物リスト','shopping'],['receipt','レシート登録','receipt'],['history','支出履歴','history'],['settings','設定','settings']];
-    app.innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">🏡</span><span><b>ふたりの家計</b><small>OUR HAPPY HOME</small></span></div><div class="side-group"><div class="side-title">MENU</div>${names.map(([id,label,ico])=>`<button data-action="nav" data-tab="${id}" class="nav-item ${state.tab===id?'active':''}" ${state.tab===id?'aria-current="page"':''}>${icon(ico)}${label}</button>`).join('')}</div><div class="sidebar-note">${icon('heart')}<strong>ふたりの日常を<br>ちょっと楽しく ♡</strong>買い物もお金の管理も、ひとつに。</div></aside><div class="main"><div class="topbar"><div class="mobile-brand"><span class="mini-logo">🏡</span> ふたりの家計</div><span class="small-label desktop-greeting">${esc(activeHome())} の暮らしの記録</span><div class="topbar-right"><span class="chip ${state.cloud?'cloud':''}">${icon(state.cloud?'users':'lock')} ${state.cloud?'夫婦で共有中':'この端末のみ'}</span><button class="avatar" data-action="nav" data-tab="settings" aria-label="設定を開く">${icon('settings')}</button></div></div>${renderFeedback()}${page()}<div class="version">Made for our little home ♡　ふたりの家計 v1.1</div></div></div><nav class="bottom-nav" aria-label="メインメニュー">${names.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-action="nav" data-tab="${id}" aria-label="${label}" ${state.tab===id?'aria-current="page"':''}>${icon(ico)}<span>${id==='shopping'?'買い物':id==='receipt'?'レシート':id==='history'?'履歴':label}</span></button>`).join('')}</nav>${state.modal?modalHtml():''}`;
+    app.innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><span class="logo">🏡</span><span><b>ふたりの家計</b><small>OUR HAPPY HOME</small></span></div><div class="side-group"><div class="side-title">MENU</div>${names.map(([id,label,ico])=>`<button data-action="nav" data-tab="${id}" class="nav-item ${state.tab===id?'active':''}" ${state.tab===id?'aria-current="page"':''}>${icon(ico)}${label}</button>`).join('')}</div><div class="sidebar-note">${icon('heart')}<strong>ふたりの日常を<br>ちょっと楽しく ♡</strong>買い物もお金の管理も、ひとつに。</div></aside><div class="main"><div class="topbar"><div class="mobile-brand"><span class="mini-logo">🏡</span> ふたりの家計</div><span class="small-label desktop-greeting">${esc(activeHome())} の暮らしの記録</span><div class="topbar-right"><span class="chip ${state.cloud?'cloud':''}">${icon(state.cloud?'users':'lock')} ${state.cloud?'夫婦で共有中':'この端末のみ'}</span><button class="avatar" data-action="nav" data-tab="settings" aria-label="設定を開く">${icon('settings')}</button></div></div>${renderFeedback()}${page()}<div class="version">Made for our little home ♡　ふたりの家計 v1.2</div></div></div><nav class="bottom-nav" aria-label="メインメニュー">${names.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-action="nav" data-tab="${id}" aria-label="${label}" ${state.tab===id?'aria-current="page"':''}>${icon(ico)}<span>${id==='shopping'?'買い物':id==='receipt'?'レシート':id==='history'?'履歴':label}</span></button>`).join('')}</nav>${state.modal?modalHtml():''}`;
   }
   function head(eyebrow,title,description,button=''){return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${description}</p></div>${button}</div>`;}
   function monthNav(){return `<div class="month-control"><button data-action="month-prev" class="icon-btn" aria-label="前の月">${icon('left')}</button><b>${monthLabel(state.month)}</b><button data-action="month-next" class="icon-btn" aria-label="次の月">${icon('right')}</button></div>`;}
@@ -552,9 +561,70 @@ window.FUTARI_CONFIG = {
   function historyPage(){const monthly=monthExpenses();return `<div class="page">${head('OUR SHOPPING DIARY','お買い物の記録 🧺','いつ・どこで・何を買ったか、まとめてチェック。',`<button class="btn primary" data-action="manual">${icon('plus')} 手入力で追加</button>`)}${monthNav()}<div class="panel"><div class="panel-header"><div><h2>買い物の履歴</h2><p>${monthly.length} 件 ・ 合計 ${money(monthly.reduce((s,i)=>s+Number(i.total),0))}</p></div><button class="btn light small" data-action="csv">${icon('download')} CSV</button></div>${!monthly.length?empty('receipt','この月の支出はありません','レシートか手入力から登録できます。'):monthly.map(e=>`<div class="history-card"><button class="history-top" data-action="expand" data-id="${att(e.id)}" aria-expanded="${state.expanded===e.id?'true':'false'}"><span class="expense-icon">${icon('store')}</span><span class="expense-main"><b>${esc(e.store_name)}</b><small>${esc(e.spent_on)} ・ ${(e.expense_items||[]).length} 明細</small></span><span class="expense-amount">${money(e.total)}</span>${icon(state.expanded===e.id?'up':'down')}</button>${state.expanded===e.id?`<div class="history-details"><div class="small-label">購入した商品</div>${(e.expense_items||[]).map(i=>`<div class="detail-row"><span><b>${esc(i.name)}</b>${i.quantity?`<br><small>数量：${esc(i.quantity)}</small>`:''}</span><span class="category-tag">${esc(i.category)}</span><b>${money(i.amount)}</b></div>`).join('')}<div class="footline">支払い：${esc(e.payment_method)}${e.memo?` ・ ${esc(e.memo)}`:''}</div><div class="detail-actions">${e.receipt_path?`<button class="btn secondary small" data-action="view-photo" data-id="${att(e.id)}">${icon('camera')} 元の写真</button>`:''}<button class="btn secondary small" data-action="edit-expense" data-id="${att(e.id)}">${icon('edit')} 編集</button><button class="btn danger small" data-action="delete-expense" data-id="${att(e.id)}">${icon('trash')} 削除</button></div></div>`:''}</div>`).join('')}</div></div>`;}
   function settingsPage(){const h=state.household;return `<div class="page">${head('TOGETHER IS BETTER','設定とふたりの共有 ⚙️','ふたりで使うための設定はこちら。')}<div class="panel"><div class="panel-header"><div><h2>${icon('users')} 共有の状態</h2><p>ひとつの世帯につき最大2人で利用できます。</p></div></div><div class="setting-row"><span>保存モード</span><b>${state.cloud?'クラウドで共有':'この端末のみ（無料）'}</b></div><div class="setting-row"><span>世帯名</span><b>${esc(activeHome())}</b></div>${state.cloud?`<div class="setting-row"><span>ログイン</span><b>${esc(state.user?.email||'')}</b></div><div class="invite"><div class="small-label">妻に送る招待コード</div><div class="invite-code">${esc(h?.invite_code||'')}</div><button class="btn light small" data-action="copy-code">${icon('copy')} コピー</button><p class="tiny">妻は同じアプリのURLで別のアカウントを作り、このコードを入力して参加できます。第三者には教えないでください。</p></div><div style="margin-top:16px"><button class="btn light" data-action="logout">${icon('logout')} ログアウト</button></div>`:`<div class="info" style="margin-top:12px">${icon('info')} <span>ローカルの記録はこのブラウザに保存され、妻のスマホとは共有されません。夫婦共有には無料Supabaseの設定が必要です。</span></div>`}</div><div class="panel"><div class="panel-header"><div><h2>${icon('users')} ${state.cloud?'共有設定を変更':'無料の夫婦共有を設定'}</h2><p>無料SupabaseのURLと公開可能なキーを接続します。</p></div></div><form id="cloud-config"><label class="field" style="margin-bottom:13px"><span>Supabase Project URL</span><input name="url" type="url" placeholder="https://xxxxx.supabase.co" value="${att(state.config.url)}" required/></label><label class="field" style="margin-bottom:13px"><span>Publishable / anon key（公開可能なキーのみ）</span><input name="key" type="text" placeholder="sb_publishable_... または eyJ..." value="${att(state.config.key)}" required/></label><div class="info warn" style="margin-bottom:13px">${icon('lock')} <span>service_role / secret キーは絶対に入力しないでください。先に同梱の schema.sql をSQL Editorで実行してください。</span></div><button type="submit" class="btn primary full">${icon('check')} 共有サービスを接続する</button></form>${state.cloud?`<div class="divider"></div><button data-action="use-local" class="btn light small">この端末のローカルモードへ切替</button><p class="tiny">切り替えてもクラウドのデータは削除されません。ローカルとクラウドのデータは自動合算されません。</p>`:''}</div><div class="panel"><div class="panel-header"><div><h2>${icon('download')} データのバックアップ</h2><p>家計をCSVで書き出せます。</p></div></div><div class="detail-actions"><button class="btn secondary" data-action="csv">${icon('download')} 支出CSV</button>${!state.cloud?`<button class="btn light" data-action="backup">${icon('download')} 全データを保存</button><label class="btn light" for="backup-file">${icon('upload')} バックアップ復元</label><input style="display:none" id="backup-file" type="file" accept="application/json,.json"/>`:''}</div><p class="tiny">${state.cloud?'クラウドデータはSupabaseに保存されます。':'この端末のデータはブラウザの消去で失われる場合があります。定期的なバックアップをおすすめします。'}</p></div><div class="panel"><div class="panel-header"><h2>${icon('lock')} プライバシーと費用</h2></div><p style="font-size:12px;color:var(--sub)">OCRはブラウザ上の無料プログラム（Tesseract.js）で動作し、読み取り画像を有料AI APIへ送信しません。最初のOCR利用時は文字認識モデルをダウンロードするのでインターネット接続が必要です。夫婦共有にはSupabaseの無料枠を利用し、上限や休止条件があります。追加の有料契約は自動では行いません。</p></div></div>`;}
   function modalHtml(){const m=state.modal;if(m.type!=='shopping-edit')return '';const i=m.item;return `<div class="modal-backdrop" data-action="modal-backdrop"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><h2 id="modal-title">買い物メモを編集</h2><form id="shopping-edit-form"><input type="hidden" name="id" value="${att(i.id)}"/><label class="field" style="margin-bottom:14px"><span>商品名 *</span><input name="name" value="${att(i.name)}" maxlength="120" required/></label><label class="field" style="margin-bottom:14px"><span>数量</span><input name="quantity" value="${att(i.quantity)}" maxlength="40" placeholder="例：2本"/></label><label class="field"><span>メモ</span><textarea name="memo" maxlength="500">${esc(i.memo)}</textarea></label><div class="modal-footer"><button class="btn light" data-action="modal-close" type="button">キャンセル</button><button class="btn primary" type="submit">${icon('check')} 保存する</button></div></form></div></div>`;}
-  function authScreen(){return `<div class="auth-wrap"><div class="auth-box"><div class="auth-head"><div class="brand-icon">⌂</div><h1>ふたりの家計</h1><p>ふたりの暮らしを、もっと軽やかに。</p></div><div class="panel"><div class="tab-sub"><button data-action="auth-login" class="${state.authMode==='login'?'active':''}">ログイン</button><button data-action="auth-signup" class="${state.authMode==='signup'?'active':''}">新規登録</button></div>${renderFeedback()}<form id="auth-form"><label class="field"><span>メールアドレス</span><input name="email" type="email" autocomplete="email" required placeholder="your@email.com"/></label><label class="field"><span>パスワード（6文字以上）</span><input name="password" type="password" minlength="6" autocomplete="${state.authMode==='login'?'current-password':'new-password'}" required placeholder="••••••••"/></label><button class="btn primary full" type="submit">${icon('right')} ${state.authMode==='login'?'ログインする':'無料でアカウント作成'}</button></form><p class="auth-foot">${icon('lock')} 夫婦の世帯データはアクセス権限で保護されます。</p></div><button data-action="use-local" class="btn ghost full" style="margin-top:16px">まずはこの端末だけで使う</button></div></div>`;}
+  function authRedirectUrl(){return `${window.location.origin}${window.location.pathname}`;}
+  function translatedAuthError(error){
+    const msg=getError(error);
+    if(/invalid login credentials|invalid credentials/i.test(msg))return 'メールアドレスまたはパスワードが一致しません。入力を確認するか、パスワードを再設定してください。';
+    if(/email not confirmed/i.test(msg))return 'メール認証が完了していません。届いた確認メールを開いてください。';
+    if(/rate limit|too many requests|over_email_send_rate_limit/i.test(msg))return 'メール送信の回数制限に達しました。時間をおいて再度お試しください。';
+    if(/email address not authorized|email address is not authorized|not authorized to send/i.test(msg))return 'Supabaseの標準メール送信の制限で、この宛先に送れません。メール送信設定をご確認ください。';
+    if(/expired|invalid.*token|token.*invalid|otp_expired/i.test(msg))return 'このメールのリンクは無効か期限切れです。もう一度再設定メールを送ってください。';
+    if(/weak password|password should|password is too|password.*least|password.*same|new password.*different/i.test(msg))return 'パスワードの条件を満たしていません。より強いパスワードを指定してください。';
+    if(/email.*invalid|invalid.*email/i.test(msg))return 'メールアドレスの形式を確認してください。';
+    return msg;
+  }
+  function authScreen(){
+    const forgot=state.authMode==='forgot'||state.authMode==='forgot-sent';
+    const heading=forgot?'パスワードを再設定 🔐':'ふたりの家計';
+    const description=forgot?'登録したメールアドレスに、再設定リンクを送ります。':'ふたりの暮らしを、もっと軽やかに。';
+    const content=forgot?`<div class="auth-flow-label">${icon('lock')} アカウントの再設定</div>${renderFeedback()}${state.authMode==='forgot-sent'?`<div class="info" role="status">${icon('info')}<span>メールを送信できる場合、再設定リンクが届きます。届かない場合は迷惑メールも確認してね。リンクは同じiPhoneのSafariで開いてください。</span></div><button class="btn light full" data-action="auth-forgot" type="button">もう一度送る</button>`:`<form id="forgot-form"><label class="field"><span>登録したメールアドレス</span><input name="email" type="email" autocomplete="email" value="${att(state.resetEmail)}" required placeholder="your@email.com"/></label><button class="btn primary full" type="submit">${icon('right')} 再設定メールを送る</button><p class="auth-foot">アカウントの有無にかかわらず同じ案内を表示します。メールの送信には無料枠の制限があります。</p></form>`}<button class="btn ghost full" type="button" data-action="auth-back-login">ログイン画面に戻る</button>`:`<div class="tab-sub"><button data-action="auth-login" class="${state.authMode==='login'?'active':''}">ログイン</button><button data-action="auth-signup" class="${state.authMode==='signup'?'active':''}">新規登録</button></div>${renderFeedback()}<form id="auth-form"><label class="field"><span>メールアドレス</span><input name="email" type="email" autocomplete="email" required placeholder="your@email.com"/></label><label class="field"><span>パスワード（6文字以上）</span><input name="password" type="password" minlength="6" autocomplete="${state.authMode==='login'?'current-password':'new-password'}" required placeholder="••••••••"/></label><button class="btn primary full" type="submit">${icon('right')} ${state.authMode==='login'?'ログインする':'無料でアカウント作成'}</button></form>${state.authMode==='login'?`<button class="btn ghost full forgot-link" data-action="auth-forgot" type="button">パスワードを忘れた方はこちら</button>`:''}<p class="auth-foot">${icon('lock')} 夫婦の世帯データはアクセス権限で保護されます。</p>`;
+    return `<div class="auth-wrap"><div class="auth-box"><div class="auth-head"><div class="brand-icon">🏡</div><h1>${heading}</h1><p>${description}</p></div><div class="panel">${content}</div><button data-action="use-local" class="btn ghost full" style="margin-top:16px">まずはこの端末だけで使う</button></div></div>`;
+  }
+  function passwordRecoveryScreen(){
+    const complete=state.authMode==='recover-done';
+    const invalid=!state.user;
+    return `<div class="auth-wrap"><div class="auth-box"><div class="auth-head"><div class="brand-icon">🔐</div><h1>${complete?'パスワードを更新したよ！':'新しいパスワードを登録'}</h1><p>${complete?'新しいパスワードで利用できるようになりました。':'新しいパスワードを設定して、家計の管理を続けよう。'}</p></div><div class="panel">${renderFeedback()}${complete?`<div class="info" role="status">${icon('check')} <span>パスワードの変更が完了しました。ログイン状態を確認して家計画面へ進みましょう。</span></div><button class="btn primary full" data-action="auth-recovery-finish">${icon('right')} 家計を開く</button>`:invalid?`<div class="feedback error" role="alert">再設定リンクの確認ができませんでした。リンクの期限切れやブラウザの違いが考えられます。新しいメールを送ってください。</div><button class="btn primary full" data-action="auth-forgot">再設定メールを送り直す</button>`:`<form id="new-password-form"><label class="field"><span>新しいパスワード（8文字以上を推奨）</span><input name="password" type="password" autocomplete="new-password" minlength="8" required placeholder="新しいパスワード" /></label><label class="field"><span>新しいパスワード（確認用）</span><input name="confirm" type="password" autocomplete="new-password" minlength="8" required placeholder="もう一度入力"/></label><button class="btn primary full" type="submit">${icon('check')} 新しいパスワードを保存</button><p class="auth-foot">再設定のリンクは他の人に共有しないでください。</p></form>`}</div></div></div>`;
+  }
   function householdScreen(){return `<div class="auth-wrap"><div class="auth-box"><div class="auth-head"><div class="brand-icon">⌂</div><h1>家族ではじめよう</h1><p>ふたりで同じ買い物リストを共有。</p></div><div class="panel"><div class="tab-sub"><button data-action="house-create" class="${state.householdMode==='create'?'active':''}">世帯を作る</button><button data-action="house-join" class="${state.householdMode==='join'?'active':''}">招待コードで参加</button></div>${renderFeedback()}<form id="house-form"><label class="field"><span>あなたの表示名（任意）</span><input name="display" maxlength="80" placeholder="例：夫、妻"/></label>${state.householdMode==='create'?`<label class="field"><span>世帯名</span><input name="name" maxlength="80" value="わが家" required/></label>`:`<label class="field"><span>パートナーから受け取った招待コード</span><input name="code" maxlength="12" placeholder="12桁のコード" autocapitalize="characters" required/></label>`}<button class="btn primary full" type="submit">${icon('right')} ${state.householdMode==='create'?'世帯を作成':'世帯に参加する'}</button></form><p class="auth-foot">1世帯2人まで。招待コードは他人に教えないでください。</p><button class="btn ghost full" style="margin-top:12px" data-action="logout">ログアウト</button></div></div></div>`;}
-  async function init(){const fromFile=window.FUTARI_CONFIG||{},stored=(()=>{try{return JSON.parse(localStorage.getItem(CONFIG_KEY)||'{}')}catch{return{}}})();state.config={url:stored.url||fromFile.supabaseUrl||'',key:stored.key||fromFile.supabasePublishableKey||''};const shouldCloud=state.config.url&&state.config.key&&!localStorage.getItem(MODE_KEY);if(shouldCloud){if(!window.supabase?.createClient){state.error='Supabaseライブラリを読み込めませんでした。通信環境を確認してください。';render();return;}try{state.cloud=window.supabase.createClient(state.config.url,state.config.key);state.cloudLoading=true;render();const result=await state.cloud.auth.getSession();if(result.error)throw result.error;state.user=result.data.session?.user||null;state.cloud.auth.onAuthStateChange((_event,session)=>{const old=state.user?.id;state.user=session?.user||null;if(old!==state.user?.id)setTimeout(()=>{void initHousehold()},0);});if(state.user)await initHousehold();else{state.cloudLoading=false;render();}}catch(e){state.cloudLoading=false;state.error=`共有の接続に失敗しました：${getError(e)}`;render();}}else render();}
+  async function init(){
+    const fromFile=window.FUTARI_CONFIG||{},stored=(()=>{try{return JSON.parse(localStorage.getItem(CONFIG_KEY)||'{}')}catch{return{}}})();
+    state.config={url:stored.url||fromFile.supabaseUrl||'',key:stored.key||fromFile.supabasePublishableKey||''};
+    const hashParams=new URLSearchParams(window.location.hash.replace(/^#/,''));
+    const recoveryLink=hashParams.get('type')==='recovery';
+    if(recoveryLink)state.authMode='recover';
+    const shouldCloud=state.config.url&&state.config.key&&!localStorage.getItem(MODE_KEY);
+    if(shouldCloud){
+      if(!window.supabase?.createClient){state.error='Supabaseライブラリを読み込めませんでした。通信環境を確認してください。';render();return;}
+      try{
+        state.cloud=window.supabase.createClient(state.config.url,state.config.key);
+        state.cloudLoading=true;render();
+        state.cloud.auth.onAuthStateChange((event,session)=>{
+          const old=state.user?.id;
+          state.user=session?.user||null;
+          if(event==='PASSWORD_RECOVERY'){
+            state.authMode='recover';state.cloudLoading=false;state.error='';
+            render();return;
+          }
+          if(state.authMode==='recover'||state.authMode==='recover-done'){
+            if(event==='SIGNED_OUT'&&state.authMode!=='recover-done'){
+              state.authMode='forgot';state.error='再設定リンクを確認できませんでした。新しい再設定メールを送ってください。';
+            }
+            state.cloudLoading=false;render();return;
+          }
+          if(old!==state.user?.id)setTimeout(()=>{void initHousehold()},0);
+        });
+        const result=await state.cloud.auth.getSession();if(result.error)throw result.error;
+        state.user=result.data.session?.user||null;
+        if(state.authMode==='recover'||state.authMode==='recover-done'){
+          state.cloudLoading=false;render();
+        }else if(state.user)await initHousehold();
+        else{state.cloudLoading=false;render();}
+      }catch(e){state.cloudLoading=false;state.error=`共有の接続に失敗しました：${translatedAuthError(e)}`;render();}
+    }else{
+      if(recoveryLink)state.error='共有設定が見つかりません。元のSafariで開き直すか、アプリの設定からSupabaseに接続してください。';
+      render();
+    }
+  }
   async function initHousehold(){if(!state.cloud)return;state.cloudLoading=true;render();try{if(!state.user){state.household=null;state.shopping=[];state.expenses=[];return;}const {data,error}=await state.cloud.rpc('get_my_household');if(error)throw error;state.household=Array.isArray(data)?data[0]||null:null;if(state.household){await loadCloud();subscribeCloud();}else{state.shopping=[];state.expenses=[];}}catch(e){state.error=`共有データの読み込みに失敗：${getError(e)}。SQL設定をご確認ください。`;state.household=null;}finally{state.cloudLoading=false;render();}}
   async function loadCloud(){if(!state.cloud||!state.household)return;const id=state.household.id;const [s,e]=await Promise.all([state.cloud.from('shopping_items').select('*').eq('household_id',id).order('created_at',{ascending:false}),state.cloud.from('expenses').select('*,expense_items(*)').eq('household_id',id).order('spent_on',{ascending:false}).order('created_at',{ascending:false})]);if(s.error)throw s.error;if(e.error)throw e.error;state.shopping=s.data||[];state.expenses=e.data||[];render();}
   let channel=null;function subscribeCloud(){if(!state.cloud||!state.household)return;if(channel)void state.cloud.removeChannel(channel);const refresh=()=>{void loadCloud().catch(e=>setNotice(getError(e),true));};channel=state.cloud.channel(`futari-${state.household.id}`).on('postgres_changes',{event:'*',schema:'public',table:'shopping_items',filter:`household_id=eq.${state.household.id}`},refresh).on('postgres_changes',{event:'*',schema:'public',table:'expenses',filter:`household_id=eq.${state.household.id}`},refresh).on('postgres_changes',{event:'*',schema:'public',table:'expense_items',filter:`household_id=eq.${state.household.id}`},refresh).subscribe();}
@@ -606,6 +676,16 @@ window.FUTARI_CONFIG = {
     if(action==='use-local'){localStorage.setItem(MODE_KEY,'1');location.reload();return;}
     if(action==='logout'){void run(async()=>{if(!state.cloud)return;const{error}=await state.cloud.auth.signOut();if(error)throw error;state.user=null;state.household=null;state.shopping=[];state.expenses=[];});return;}
     if(action==='auth-login'||action==='auth-signup'){state.authMode=action==='auth-login'?'login':'signup';state.error='';state.notice='';return render();}
+    if(action==='auth-forgot'){
+      const email=app.querySelector('#auth-form input[name="email"]');
+      if(email?.value)state.resetEmail=email.value.trim();
+      state.authMode='forgot';state.error='';state.notice='';return render();
+    }
+    if(action==='auth-back-login'){state.authMode='login';state.error='';state.notice='';return render();}
+    if(action==='auth-recovery-finish'){
+      state.authMode='login';state.notice='パスワードの更新が完了しました。';state.error='';
+      if(state.user){void initHousehold();}else render();return;
+    }
     if(action==='house-create'||action==='house-join'){state.householdMode=action==='house-create'?'create':'join';state.error='';return render();}
   }
   document.addEventListener('click',e=>{const el=e.target.closest('[data-action]');if(el)actionClick(el,e);});
@@ -618,7 +698,38 @@ window.FUTARI_CONFIG = {
     if(form.getAttribute('id')==='shopping-edit-form'){const id=String(f.get('id')||'');void run(async()=>{await updateShopping(id,{name:String(f.get('name')||'').trim(),quantity:String(f.get('quantity')||'').trim(),memo:String(f.get('memo')||'').trim()});state.modal=null;state.notice='買い物メモを更新しました';});return;}
     if(form.getAttribute('id')==='expense-form'){void run(saveExpense);return;}
     if(form.getAttribute('id')==='cloud-config'){const url=String(f.get('url')||'').trim().replace(/\/$/,''),key=String(f.get('key')||'').trim();if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)){setNotice('SupabaseのProject URLを入力してください（https://...supabase.co）。',true);return;}if(!isPublicKey(key)){setNotice('Publishable key または anon key だけを設定してください。secret/service_role は使用できません。',true);return;}localStorage.setItem(CONFIG_KEY,JSON.stringify({url,key}));localStorage.removeItem(MODE_KEY);location.reload();return;}
-    if(form.getAttribute('id')==='auth-form')void run(async()=>{const email=String(f.get('email')||''),password=String(f.get('password')||'');if(state.authMode==='login'){const {error}=await state.cloud.auth.signInWithPassword({email,password});if(error)throw error;await initHousehold();}else{const{data,error}=await state.cloud.auth.signUp({email,password});if(error)throw error;if(!data.session){state.notice='確認メールを送りました。メール内のリンクで認証してからログインしてください。';}else await initHousehold();}});
+    if(form.getAttribute('id')==='auth-form')void run(async()=>{
+      const email=String(f.get('email')||'').trim(),password=String(f.get('password')||'');
+      if(state.authMode==='login'){
+        const {error}=await state.cloud.auth.signInWithPassword({email,password});
+        if(error)throw new Error(translatedAuthError(error));
+        await initHousehold();
+      }else{
+        const {data,error}=await state.cloud.auth.signUp({email,password,options:{emailRedirectTo:authRedirectUrl()}});
+        if(error)throw new Error(translatedAuthError(error));
+        if(!data.session){state.notice='確認メールを送信しました。メール内のリンクをSafariで開いてください。';}
+        else await initHousehold();
+      }
+    });
+    if(form.getAttribute('id')==='forgot-form')void run(async()=>{
+      const email=String(f.get('email')||'').trim();
+      state.resetEmail=email;
+      const {error}=await state.cloud.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl()});
+      if(error)throw new Error(translatedAuthError(error));
+      state.authMode='forgot-sent';
+      state.notice='再設定メールの送信を受け付けました。受信トレイを確認してね。';
+    });
+    if(form.getAttribute('id')==='new-password-form')void run(async()=>{
+      const password=String(f.get('password')||''),again=String(f.get('confirm')||'');
+      if(password.length<8)throw new Error('新しいパスワードは8文字以上にしてください。');
+      if(password!==again)throw new Error('確認用のパスワードが一致しません。');
+      if(!state.user)throw new Error('再設定リンクの有効期限が切れています。メールを再送してください。');
+      const {error}=await state.cloud.auth.updateUser({password});
+      if(error)throw new Error(translatedAuthError(error));
+      state.authMode='recover-done';
+      state.notice='パスワードを更新しました。';
+      window.history.replaceState(null,'',authRedirectUrl());
+    });
     if(form.getAttribute('id')==='house-form')void run(async()=>{const args=state.householdMode==='create'?{p_name:String(f.get('name')||''),p_display_name:String(f.get('display')||'')}:{p_invite_code:String(f.get('code')||'').trim().toUpperCase(),p_display_name:String(f.get('display')||'')};const{error}=await state.cloud.rpc(state.householdMode==='create'?'create_household':'join_household',args);if(error)throw error;await initHousehold();});
   });
   void init();
